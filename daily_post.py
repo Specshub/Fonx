@@ -20,10 +20,17 @@ def get_new_access_token():
     return res.json().get('access_token')
 
 def write_story():
-    # تحديث الرابط إلى النسخة المستقرة v1 والموديل الأحدث لعام 2026
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    # تحديث المحرك إلى Gemini 3 Flash (موديل 2026)
+    # نستخدم الإصدار v1 المستقر
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key={GEMINI_KEY}"
     
-    prompt = "اكتب قصة درامية أدبية مشوقة باللغة العربية بأسلوب المسلسلات التركية. اجعل المقال طويلاً (أكثر من 800 كلمة)، وفي النهاية أضف 'تأملات قانونية' تربط القصة بالحقوق والواجبات بأسلوب رصين."
+    prompt = """
+    اكتب قصة أدبية درامية مشوقة باللغة العربية بأسلوب المسلسلات التركية الراقية.
+    المواصفات:
+    1. طول المقال يتجاوز 800 كلمة.
+    2. صراع درامي نفسي قوي.
+    3. في النهاية، أضف فقرة 'رؤية قانونية' تحلل أحداث القصة من منظور الحقوق والواجبات (بما يتناسب مع خبرتك في القانون).
+    """
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}]
@@ -32,36 +39,38 @@ def write_story():
     res = requests.post(url, json=payload)
     response_data = res.json()
     
+    # فحص الرد للتأكد من نجاح العملية
     if 'candidates' in response_data:
         return response_data['candidates'][0]['content']['parts'][0]['text']
     else:
-        # إذا فشل الرابط الأول، سنجرب الرابط الاحتياطي لضمان الإقلاع
-        print("⚠️ الرابط الأول فشل، نجرب الرابط الاحتياطي...")
-        url_alt = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_KEY}"
-        res = requests.post(url_alt, json=payload)
-        response_data = res.json()
-        if 'candidates' in response_data:
-            return response_data['candidates'][0]['content']['parts'][0]['text']
-        else:
-            print("❌ فشل Gemini تماماً. الرد:")
-            print(response_data)
-            return None
+        print("❌ فشل الاتصال بمحرك 2026. الرد:")
+        print(response_data)
+        return None
 
 def post_to_blogger(content):
     if not content: return
     token = get_new_access_token()
     url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/"
-    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-    title = f"حكاية اليوم: {content[:40]}..." 
-    data = {"kind": "blogger#post", "title": title, "content": content, "labels": ["قصص درامية", "ثقافة قانونية"]}
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+    # عنوان جذاب للمقال
+    title = f"قصص وأحكام: {content[:45].strip()}..." 
+    data = {
+        "kind": "blogger#post",
+        "title": title,
+        "content": content,
+        "labels": ["دراما واقعية", "فلسفة قانونية"]
+    }
     
     res = requests.post(url, headers=headers, json=data)
     if res.status_code == 200:
-        print("✅ مبروك يا قبطان! تم النشر في بلوجر بنجاح.")
+        print("✅ مبروك يا قبطان! تم النشر في مدونة Mixa TV بنجاح ساحق.")
     else:
-        print(f"❌ فشل النشر في بلوجر. الرد: {res.text}")
+        print(f"❌ فشل النشر في بلوجر. السبب: {res.text}")
 
-# إطلاق المحرك
-story = write_story()
-if story:
-    post_to_blogger(story)
+# التنفيذ النهائي
+story_text = write_story()
+if story_text:
+    post_to_blogger(story_text)
