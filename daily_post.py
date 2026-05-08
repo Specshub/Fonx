@@ -1,8 +1,9 @@
 import requests
 import os
 import time
+import random
 
-# الكنوز (تأكد من وجودها في GitHub Secrets)
+# الكنوز (تأكد أنها في GitHub Secrets)
 GEMINI_KEY = os.getenv('GEMINI_KEY')
 BLOG_ID = os.getenv('BLOG_ID')
 REFRESH_TOKEN = os.getenv('REFRESH_TOKEN')
@@ -18,24 +19,27 @@ def get_new_access_token():
     return requests.post(url, data=data).json().get('access_token')
 
 def write_story():
-    # سنركز على الموديل الذي أعطى استجابة (حتى لو كانت زحاماً)
+    # استخدام الإصدار v1beta مع موديل 2.0 فلاش (الأكثر استجابة حالياً)
     model = "gemini-2.0-flash" 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
     
     prompt = "اكتب قصة درامية أدبية مشوقة باللغة العربية (أكثر من 800 كلمة) بأسلوب روائي حصري، وفي النهاية أضف حكمة قانونية عميقة تناسب الأحداث."
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
-    # محاولة لثلاث مرات في حال وجود زحام (خطأ 429)
-    for attempt in range(3):
-        print(f"🔄 محاولة التأليف (المحاولة {attempt + 1})...")
+    # نظام المحاولات "المراوغ"
+    for attempt in range(5): # رفعنا عدد المحاولات لـ 5
+        # انتظار عشوائي في البداية لتجنب "تزامن" السيرفرات
+        wait_time = random.randint(30, 90) 
+        print(f"🔄 المحاولة {attempt + 1}: سأنتظر {wait_time} ثانية قبل الهجوم...")
+        time.sleep(wait_time)
+        
         res = requests.post(url, json=payload)
         
         if res.status_code == 200:
-            print(f"✅ نجح التأليف أخيراً!")
+            print(f"✅ نجح الاختراق! تم تأليف القصة.")
             return res.json()['candidates'][0]['content']['parts'][0]['text']
         elif res.status_code == 429:
-            print("⚠️ السيرفر مزدحم (429).. سأنتظر 30 ثانية ثم أحاول مجدداً.")
-            time.sleep(30) # انتظار نصف دقيقة
+            print("⚠️ السيرفر لا يزال مزدحماً.. سأنسحب مؤقتاً.")
         else:
             print(f"❌ خطأ غير متوقع: {res.status_code}")
             break
@@ -49,19 +53,17 @@ def post_to_blogger(content):
     headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
     data = {
         "kind": "blogger#post",
-        "title": f"حكاية وتأمل: {content[:35].strip()}...",
+        "title": f"تأملات اليوم: {content[:35].strip()}...",
         "content": content,
-        "labels": ["دراما 2026", "فكر قانوني"]
+        "labels": ["دراما 2026", "ثقافة قانونية"]
     }
     res = requests.post(url, headers=headers, json=data)
     if res.status_code == 200:
-        print("✅ مبروك يا قبطان! تم النشر في Mixa TV بنجاح ساحق.")
+        print("✅ مبروك يا قبطان! تم النشر في مدونة Mixa TV.")
     else:
-        print(f"❌ فشل النشر: {res.text}")
+        print(f"❌ فشل النشر في بلوجر.")
 
-# الإقلاع
+# التنفيذ
 story = write_story()
 if story:
     post_to_blogger(story)
-else:
-    print("❌ للأسف لم نتمكن من تجاوز زحام السيرفر اليوم. جرب تشغيله يدوياً بعد قليل.")
