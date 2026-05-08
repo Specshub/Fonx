@@ -1,7 +1,8 @@
 import requests
 import os
+import time
 
-# --- الكنوز المستخرجة من أسرار GitHub ---
+# الكنوز (تأكد من وجودها في GitHub Secrets)
 GEMINI_KEY = os.getenv('GEMINI_KEY')
 BLOG_ID = os.getenv('BLOG_ID')
 REFRESH_TOKEN = os.getenv('REFRESH_TOKEN')
@@ -9,74 +10,58 @@ CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 CLIENT_ID = "644474811808-67jn32susumuth7iar9fk6bfq9ir6ndn.apps.googleusercontent.com"
 
 def get_new_access_token():
-    """توليد تصريح دخول جديد لمدونة Mixa TV"""
     url = "https://oauth2.googleapis.com/token"
     data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "refresh_token": REFRESH_TOKEN,
-        "grant_type": "refresh_token"
+        "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
+        "refresh_token": REFRESH_TOKEN, "grant_type": "refresh_token"
     }
     return requests.post(url, data=data).json().get('access_token')
 
 def write_story():
-    """تأليف القصة باستخدام أفضل موديل متاح حالياً"""
-    # قائمة الموديلات المتاحة في 2026 حسب الأولوية
-    models_to_try = [
-        "gemini-1.5-flash", 
-        "gemini-2.0-flash", 
-        "gemini-pro"
-    ]
+    # سنركز على الموديل الذي أعطى استجابة (حتى لو كانت زحاماً)
+    model = "gemini-2.0-flash" 
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
     
-    prompt = """
-    اكتب قصة أدبية درامية مشوقة باللغة العربية بأسلوب المسلسلات التركية الراقية.
-    المواصفات:
-    1. طول المقال يتجاوز 800 كلمة.
-    2. ركز على الصراعات النفسية والاجتماعية.
-    3. في النهاية، أضف فقرة 'رؤية قانونية' تحلل أحداث القصة من منظور الحقوق والواجبات بأسلوب أكاديمي رصين.
-    """
-    
+    prompt = "اكتب قصة درامية أدبية مشوقة باللغة العربية (أكثر من 800 كلمة) بأسلوب روائي حصري، وفي النهاية أضف حكمة قانونية عميقة تناسب الأحداث."
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
-    for model in models_to_try:
-        print(f"🔄 محاولة إرسال الطلب عبر موديل: {model}...")
-        # نستخدم v1 المستقرة لأنها الأكثر أماناً في 2026
-        url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={GEMINI_KEY}"
+    # محاولة لثلاث مرات في حال وجود زحام (خطأ 429)
+    for attempt in range(3):
+        print(f"🔄 محاولة التأليف (المحاولة {attempt + 1})...")
         res = requests.post(url, json=payload)
         
         if res.status_code == 200:
-            print(f"✅ نجح الاتصال بموديل {model}!")
+            print(f"✅ نجح التأليف أخيراً!")
             return res.json()['candidates'][0]['content']['parts'][0]['text']
+        elif res.status_code == 429:
+            print("⚠️ السيرفر مزدحم (429).. سأنتظر 30 ثانية ثم أحاول مجدداً.")
+            time.sleep(30) # انتظار نصف دقيقة
         else:
-            print(f"⚠️ الموديل {model} أعاد خطأ: {res.status_code}")
-
-    print("❌ للأسف، فشلت جميع محاولات الاتصال بالموديلات.")
+            print(f"❌ خطأ غير متوقع: {res.status_code}")
+            break
+            
     return None
 
 def post_to_blogger(content):
-    """نشر القصة في مدونة Mixa TV"""
     if not content: return
     token = get_new_access_token()
     url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/"
     headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-    
-    # تنسيق العنوان ليكون جذاباً في محركات البحث
-    title = f"حكايات درامية: {content[:40].strip()}..."
-    
     data = {
         "kind": "blogger#post",
-        "title": title,
+        "title": f"حكاية وتأمل: {content[:35].strip()}...",
         "content": content,
-        "labels": ["دراما واقعية", "ثقافة قانونية"]
+        "labels": ["دراما 2026", "فكر قانوني"]
     }
-    
     res = requests.post(url, headers=headers, json=data)
     if res.status_code == 200:
-        print("✅ مبروك! تم النشر في مدونة Mixa TV بنجاح.")
+        print("✅ مبروك يا قبطان! تم النشر في Mixa TV بنجاح ساحق.")
     else:
-        print(f"❌ فشل النشر في بلوجر. الرد: {res.text}")
+        print(f"❌ فشل النشر: {res.text}")
 
-# --- إطلاق المحرك ---
+# الإقلاع
 story = write_story()
 if story:
     post_to_blogger(story)
+else:
+    print("❌ للأسف لم نتمكن من تجاوز زحام السيرفر اليوم. جرب تشغيله يدوياً بعد قليل.")
