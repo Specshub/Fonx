@@ -1,0 +1,25 @@
+name: Daily Blogger Post
+on:
+  schedule:
+    - cron: '0 10 * * *' # سينشر مقالاً كل يوم الساعة 10 صباحاً بتوقيت جرينتش
+  workflow_dispatch: # هذا الزر سيظهر لك لتشغيل البوت يدوياً للتجربة
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run script
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          BLOG_ID: ${{ secrets.BLOG_ID }}
+          REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+        run: python daily_post.py
