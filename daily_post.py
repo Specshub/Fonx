@@ -1,7 +1,7 @@
 import requests
 import os
 
-# جلب البيانات من أسرار GitHub
+# --- الكنوز المستخرجة من أسرار GitHub ---
 GEMINI_KEY = os.getenv('GEMINI_KEY')
 BLOG_ID = os.getenv('BLOG_ID')
 REFRESH_TOKEN = os.getenv('REFRESH_TOKEN')
@@ -9,6 +9,7 @@ CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 CLIENT_ID = "644474811808-67jn32susumuth7iar9fk6bfq9ir6ndn.apps.googleusercontent.com"
 
 def get_new_access_token():
+    """توليد تصريح دخول جديد لمدونة Mixa TV"""
     url = "https://oauth2.googleapis.com/token"
     data = {
         "client_id": CLIENT_ID,
@@ -16,61 +17,66 @@ def get_new_access_token():
         "refresh_token": REFRESH_TOKEN,
         "grant_type": "refresh_token"
     }
-    res = requests.post(url, data=data)
-    return res.json().get('access_token')
+    return requests.post(url, data=data).json().get('access_token')
 
 def write_story():
-    # تحديث المحرك إلى Gemini 3 Flash (موديل 2026)
-    # نستخدم الإصدار v1 المستقر
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key={GEMINI_KEY}"
+    """تأليف القصة باستخدام أفضل موديل متاح حالياً"""
+    # قائمة الموديلات المتاحة في 2026 حسب الأولوية
+    models_to_try = [
+        "gemini-1.5-flash", 
+        "gemini-2.0-flash", 
+        "gemini-pro"
+    ]
     
     prompt = """
     اكتب قصة أدبية درامية مشوقة باللغة العربية بأسلوب المسلسلات التركية الراقية.
     المواصفات:
     1. طول المقال يتجاوز 800 كلمة.
-    2. صراع درامي نفسي قوي.
-    3. في النهاية، أضف فقرة 'رؤية قانونية' تحلل أحداث القصة من منظور الحقوق والواجبات (بما يتناسب مع خبرتك في القانون).
+    2. ركز على الصراعات النفسية والاجتماعية.
+    3. في النهاية، أضف فقرة 'رؤية قانونية' تحلل أحداث القصة من منظور الحقوق والواجبات بأسلوب أكاديمي رصين.
     """
     
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-    
-    res = requests.post(url, json=payload)
-    response_data = res.json()
-    
-    # فحص الرد للتأكد من نجاح العملية
-    if 'candidates' in response_data:
-        return response_data['candidates'][0]['content']['parts'][0]['text']
-    else:
-        print("❌ فشل الاتصال بمحرك 2026. الرد:")
-        print(response_data)
-        return None
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    for model in models_to_try:
+        print(f"🔄 محاولة إرسال الطلب عبر موديل: {model}...")
+        # نستخدم v1 المستقرة لأنها الأكثر أماناً في 2026
+        url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={GEMINI_KEY}"
+        res = requests.post(url, json=payload)
+        
+        if res.status_code == 200:
+            print(f"✅ نجح الاتصال بموديل {model}!")
+            return res.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            print(f"⚠️ الموديل {model} أعاد خطأ: {res.status_code}")
+
+    print("❌ للأسف، فشلت جميع محاولات الاتصال بالموديلات.")
+    return None
 
 def post_to_blogger(content):
+    """نشر القصة في مدونة Mixa TV"""
     if not content: return
     token = get_new_access_token()
     url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/"
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json'
-    }
-    # عنوان جذاب للمقال
-    title = f"قصص وأحكام: {content[:45].strip()}..." 
+    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    
+    # تنسيق العنوان ليكون جذاباً في محركات البحث
+    title = f"حكايات درامية: {content[:40].strip()}..."
+    
     data = {
         "kind": "blogger#post",
         "title": title,
         "content": content,
-        "labels": ["دراما واقعية", "فلسفة قانونية"]
+        "labels": ["دراما واقعية", "ثقافة قانونية"]
     }
     
     res = requests.post(url, headers=headers, json=data)
     if res.status_code == 200:
-        print("✅ مبروك يا قبطان! تم النشر في مدونة Mixa TV بنجاح ساحق.")
+        print("✅ مبروك! تم النشر في مدونة Mixa TV بنجاح.")
     else:
-        print(f"❌ فشل النشر في بلوجر. السبب: {res.text}")
+        print(f"❌ فشل النشر في بلوجر. الرد: {res.text}")
 
-# التنفيذ النهائي
-story_text = write_story()
-if story_text:
-    post_to_blogger(story_text)
+# --- إطلاق المحرك ---
+story = write_story()
+if story:
+    post_to_blogger(story)
