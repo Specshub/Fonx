@@ -1,86 +1,103 @@
 import requests
 import os
-import time
-import random
 
-# الكنوز
+# --- البيانات السرية (تأكد من وجودها في GitHub Secrets) ---
 GEMINI_KEY = os.getenv('GEMINI_KEY')
 BLOG_ID = os.getenv('BLOG_ID')
 REFRESH_TOKEN = os.getenv('REFRESH_TOKEN')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+
+# رابط النفق السري الذي قمت بإنشائه (تم تحديثه)
+GAS_URL = "https://script.google.com/macros/s/AKfycbyAZPAkBzx2SWUV8_gY7TtYPNv1NRJ3u7ovofb4YJzqwknoyyC6PwDTXsthNu2nUK8KSw/exec"
+
+# الهوية الخاصة بك (لا تتغير)
 CLIENT_ID = "644474811808-67jn32susumuth7iar9fk6bfq9ir6ndn.apps.googleusercontent.com"
 
 def get_new_access_token():
+    """توليد تصريح دخول جديد لمدونة Mixa TV"""
     url = "https://oauth2.googleapis.com/token"
     data = {
-        "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-        "refresh_token": REFRESH_TOKEN, "grant_type": "refresh_token"
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "refresh_token": REFRESH_TOKEN,
+        "grant_type": "refresh_token"
     }
-    return requests.post(url, data=data).json().get('access_token')
+    try:
+        res = requests.post(url, data=data)
+        return res.json().get('access_token')
+    except Exception as e:
+        print(f"❌ خطأ في جلب Access Token: {e}")
+        return None
 
 def write_story():
-    # نعود للموديل الذي أعطانا استجابة حقيقية (2.0)
-    model = "gemini-2.0-flash" 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
+    """تأليف القصة عبر نفق Google Apps Script لتجاوز الحظر"""
+    print("🚀 إرسال الطلب عبر 'نفق جوجل السري'...")
     
-    prompt = "اكتب قصة درامية أدبية مشوقة باللغة العربية (أكثر من 900 كلمة)، بأسلوب روائي حصري، وفي النهاية أضف تحليلاً قانونياً فلسفياً للأحداث."
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-
-    # بصمات متصفحات حقيقية متنوعة
-    browsers = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
-    ]
-
-    for attempt in range(3):
-        # تمويه هيدرز المتصفح
-        headers = {
-            "User-Agent": random.choice(browsers),
-            "Content-Type": "application/json",
-            "Referer": "https://aistudio.google.com/",
-            "X-Goog-Api-Client": "gl-py/3.10.0" # إضافة بصمة تبدو كأنها مكتبة محلية وليست سحابة
-        }
+    # البرومبت المخصص الذي يجمع بين الدراما وخلفيتك القانونية
+    prompt = """
+    اكتب قصة أدبية درامية مشوقة باللغة العربية بأسلوب روائي حصري (أكثر من 900 كلمة).
+    الموضوع: صراع اجتماعي أو عائلي بأسلوب المسلسلات التركية المعاصرة.
+    في نهاية المقال، أضف فقرة بعنوان 'الخلاصة القانونية' تحلل فيها الأحداث من منظور القانون والحقوق (بصفتك طالب قانون).
+    """
+    
+    payload = {
+        "apiKey": GEMINI_KEY,
+        "prompt": prompt
+    }
+    
+    try:
+        # إرسال الطلب للرابط الذي زودتني به
+        res = requests.post(GAS_URL, json=payload, timeout=120)
         
-        wait = random.randint(60, 120)
-        print(f"🔄 محاولة 'شبح' رقم {attempt + 1}: الموديل {model} - الانتظار {wait} ثانية...")
-        time.sleep(wait)
-        
-        try:
-            res = requests.post(url, json=payload, headers=headers, timeout=60)
-            
-            if res.status_code == 200:
-                print("✅ مبروك! تم اختراق الحصار وتوليد القصة.")
-                return res.json()['candidates'][0]['content']['parts'][0]['text']
-            elif res.status_code == 429:
-                print("⚠️ لا يزال هناك زحام (429).. جوجل تراقب هذا الـ IP بشدة.")
-            elif res.status_code == 404:
-                print("❌ خطأ 404: الموديل أو الرابط غير صحيح. سأحاول تحويل الرابط لـ v1...")
-                url = url.replace("v1beta", "v1")
+        if res.status_code == 200:
+            data = res.json()
+            if 'candidates' in data:
+                print("✅ نجح الاختراق! تم توليد القصة بنجاح.")
+                return data['candidates'][0]['content']['parts'][0]['text']
             else:
-                print(f"❌ فشل بترميز: {res.status_code}")
-        except Exception as e:
-            print(f"❌ عطل فني: {e}")
-            
+                print(f"⚠️ الرد من النفق لا يحتوي على قصة: {data}")
+        else:
+            print(f"❌ النفق أعاد خطأ: {res.status_code}")
+    except Exception as e:
+        print(f"❌ عطل في الاتصال بالنفق: {e}")
+        
     return None
 
 def post_to_blogger(content):
+    """نشر القصة في مدونة Blogger"""
     if not content: return
+    
     token = get_new_access_token()
+    if not token: return
+    
     url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/"
-    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+    
+    # صياغة عنوان جذاب
+    title = f"حكايات Mixa: {content[:45].strip()}..."
+    
     data = {
         "kind": "blogger#post",
-        "title": f"حكاية من عمق القانون: {content[:30]}...",
+        "title": title,
         "content": content,
-        "labels": ["دراما 2026", "قصص حصرية"]
+        "labels": ["دراما واقعية", "ثقافة قانونية"]
     }
-    requests.post(url, headers=headers, json=data)
-    print("✅ تم النشر بنجاح!")
+    
+    try:
+        res = requests.post(url, headers=headers, json=data)
+        if res.status_code == 200:
+            print("✅ مبروك يا قبطان! أول مقال عبر النفق السري نُشر في مدونة Mixa TV.")
+        else:
+            print(f"❌ فشل النشر في بلوجر: {res.text}")
+    except Exception as e:
+        print(f"❌ خطأ أثناء النشر: {e}")
 
-# انطلاق الغواصة
-story = write_story()
-if story:
-    post_to_blogger(story)
+# --- إطلاق العملية ---
+story_content = write_story()
+if story_content:
+    post_to_blogger(story_content)
 else:
-    print("🚩 فشلت المهمة السرية. الـ IP الخاص بـ GitHub محظور مؤقتاً. جرب بعد ساعة.")
+    print("🚩 فشلت المهمة في مرحلة التأليف. تأكد من تفعيل Web App في جوجل بشكل صحيح.")
